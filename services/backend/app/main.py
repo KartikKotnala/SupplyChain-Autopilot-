@@ -354,6 +354,17 @@ def test_guardrails(req: GuardrailTestRequest):
     return res.model_dump()
 
 
+@app.get("/api/callbacks")
+def get_callbacks(workflow_id: Optional[str] = None):
+    """Returns task monitoring and logging callback events across ADK, CrewAI, and FastMCP."""
+    from services.adk_orchestrator.callbacks import CallbackRegistry
+    if workflow_id:
+        events = CallbackRegistry.get_workflow_events(workflow_id)
+    else:
+        events = CallbackRegistry.get_all_events(limit=50)
+    return [e.model_dump(mode="json") for e in events]
+
+
 @app.get("/api/benchmarks/summary")
 def get_benchmark_summary():
     """Returns aggregated performance, cost, and latency metrics across architectures and personas."""

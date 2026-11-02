@@ -13,6 +13,7 @@ from contracts.invoice import InvoiceAuditResult
 from contracts.final_output import FinalWorkflowOutput
 
 from services.erp_db_mcp.server import get_component_inventory
+from services.adk_orchestrator.callbacks import ADKAgentCallback, MCPToolCallback
 from services.adk_orchestrator.inventory_agent import run_inventory_monitoring_agent
 from services.adk_orchestrator.risk_agent import run_risk_optimization_agent
 from services.crewai_service.agents import run_sourcing_and_rfq_crew, run_invoice_audit_crew
@@ -51,11 +52,18 @@ def execute_procurement_workflow(
             )
 
         # 2. Stage 1: Inventory Analysis (ADK Inventory Agent)
-        shortage = run_inventory_monitoring_agent(
-            component_id=component_id,
-            workflow_id=wf_id,
-            trace_id=t_id,
-        )
+        inv_cb = ADKAgentCallback("ADK_InventoryAgent", wf_id, t_id)
+        inv_cb.before_agent_callback({"component_id": component_id})
+        try:
+            shortage = run_inventory_monitoring_agent(
+                component_id=component_id,
+                workflow_id=wf_id,
+                trace_id=t_id,
+            )
+            inv_cb.after_agent_callback({"has_shortage": shortage is not None})
+        except Exception as e:
+            inv_cb.on_error_callback(e)
+            raise
 
         if not shortage:
             # Healthy inventory - no procurement required
@@ -105,22 +113,32 @@ def execute_procurement_workflow(
         )
 
         # 4. Stage 3: Risk & Trade-Off Optimization (ADK Risk Agent)
-        inv_data = get_component_inventory(component_id)
-        downtime_cost = inv_data.get("downtime_cost_per_day", 10000.0)
-        budget_limit = inv_data.get("budget_limit", 50000.0)
-        criticality = inv_data.get("criticality", "HIGH")
+        risk_cb = ADKAgentCallback("ADK_RiskAgent", wf_id, t_id)
+        risk_cb.before_agent_callback({"quotes_count": len(rfq_quotes.quotes)})
+        try:
+            inv_data = get_component_inventory(component_id)
+            downtime_cost = inv_data.get("downtime_cost_per_day", 10000.0)
+            budget_limit = inv_data.get("budget_limit", 50000.0)
+            criticality = inv_data.get("criticality", "HIGH")
 
-        risk_decision = run_risk_optimization_agent(
-            workflow_id=wf_id,
-            component_id=component_id,
-            quotes_list=rfq_quotes,
-            buffer_days=shortage.buffer_days,
-            downtime_cost_per_day=downtime_cost,
-            budget_limit=budget_limit,
-            component_criticality=criticality,
-            weights=weights,
-            trace_id=t_id,
-        )
+            risk_decision = run_risk_optimization_agent(
+                workflow_id=wf_id,
+                component_id=component_id,
+                quotes_list=rfq_quotes,
+                buffer_days=shortage.buffer_days,
+                downtime_cost_per_day=downtime_cost,
+                budget_limit=budget_limit,
+                component_criticality=criticality,
+                weights=weights,
+                trace_id=t_id,
+            )
+            risk_cb.after_agent_callback({
+                "selected_supplier": risk_decision.selected_supplier_id,
+                "approval_required": risk_decision.approval_required,
+            })
+        except Exception as e:
+            risk_cb.on_error_callback(e)
+            raise
 
         # Update workflow record with decision metrics
         wf_record.selected_supplier_id = risk_decision.selected_supplier_id
