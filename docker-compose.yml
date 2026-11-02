@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: supplychain_postgres
+    environment:
+      POSTGRES_USER: supplychain
+      POSTGRES_PASSWORD: supplychain_password
+      POSTGRES_DB: supplychain_autopilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supplychain -d supplychain_autopilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: supplychain_phoenix
+    ports:
+      - "6006:6006"
+    environment:
+      PHOENIX_PORT: 6006
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6006/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  crewai-service:
+    build:
+      context: .
+      dockerfile: services/crewai_service/Dockerfile
+    container_name: supplychain_crewai
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://supplychain:supplychain_password@postgres:5432/supplychain_autopilot
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+    container_name: supplychain_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://supplychain:supplychain_password@postgres:5432/supplychain_autopilot
+      CREWAI_A2A_URL: http://crewai-service:8001
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      crewai-service:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: supplychain_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
