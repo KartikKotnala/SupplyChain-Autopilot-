@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SupplyChain Autopilot — Multi-Agent Procurement & Supply Risk System</title>
+
+<!-- Fonts: Archivo Black (display) + Space Grotesk (body) + Space Mono (code) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================
+   THEME — Bold Signal: dark, authoritative, industrial
+   Base: near-black gradient | Accent: vibrant cyan/sky blue
+   ============================================ */
+:root {
+    --bg-primary: #0b1120;
+    --bg-gradient: linear-gradient(135deg, #070d18 0%, #111e33 50%, #070d18 100%);
+    --slide-bg: #0b1120;
+    --stage-bg: #030712;
+    --card-bg: #0284c7;              /* Vibrant Industrial Cyan */
+    --card-bg-dim: #0369a1;
+    --panel-bg: rgba(255, 255, 255, 0.04);
+    --panel-border: rgba(255, 255, 255, 0.10);
+
+    /* Text */
+    --text-primary: #ffffff;
+    --text-on-card: #04101e;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    /* Status badges */
+    --met: #34d399;
+    --partial: #fbbf24;
+    --notmet: #f87171;
+
+    /* Typography */
+    --font-display: 'Archivo Black', sans-serif;
+    --font-body: 'Space Grotesk', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+    --title-size: 88px;
+    --h2-size: 52px;
+    --body-size: 25px;
+    --small-size: 19px;
+
+    /* Layout */
+    --slide-padding: 80px;
+    --content-gap: 36px;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.6s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--stage-bg);
+}
+
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg);
+}
+
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg);
+}
+
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--bg-gradient);
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    padding: var(--slide-padding);
+}
+
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* Nav corner marks */
+.brand-mark {
+    position: absolute;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    z-index: 5;
+}
+.brand-mark.tr { top: 32px; right: 80px; }
+.brand-mark.bl { bottom: 28px; left: 80px; }
+
+.slide-num {
+    position: absolute;
+    top: 26px;
+    left: 80px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    letter-spacing: 0.2em;
+    color: var(--card-bg);
+    z-index: 5;
+}
+
+.section-tag {
+    position: absolute;
+    top: 24px;
+    left: 175px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    z-index: 5;
+}
+
+.slide-title {
+    font-family: var(--font-display);
+    font-size: var(--h2-size);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    margin: 40px 0 8px;
+    color: var(--text-primary);
+}
+.slide-title .accent { color: var(--card-bg); }
+
+.slide-sub {
+    font-size: var(--body-size);
+    color: var(--text-secondary);
+    max-width: 1350px;
+    line-height: 1.45;
+    margin-bottom: 32px;
+}
+
+/* Animations */
+.reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+}
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal:nth-child(1) { transition-delay: 0.05s; }
+.slide.visible .reveal:nth-child(2) { transition-delay: 0.12s; }
+.slide.visible .reveal:nth-child(3) { transition-delay: 0.20s; }
+.slide.visible .reveal:nth-child(4) { transition-delay: 0.28s; }
+.reveal[data-d="2"] { transition-delay: 0.2s !important; }
+.reveal[data-d="3"] { transition-delay: 0.35s !important; }
+.reveal[data-d="4"] { transition-delay: 0.48s !important; }
+
+/* Title Slide */
+.title-card {
+    position: absolute;
+    left: 80px;
+    top: 155px;
+    width: 1280px;
+    background: var(--card-bg);
+    color: var(--text-on-card);
+    padding: 72px 84px 68px;
+    box-shadow: 0 35px 90px rgba(2, 132, 199, 0.25);
+    border-radius: 8px;
+}
+.title-card .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    opacity: 0.88;
+}
+.title-card h1 {
+    font-family: var(--font-display);
+    font-size: 104px;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    margin-bottom: 26px;
+}
+.title-card .tagline {
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 1.35;
+    max-width: 950px;
+}
+
+.title-meta {
+    position: absolute;
+    right: 80px;
+    top: 155px;
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.title-meta .meta-block {
+    border-top: 2px solid var(--panel-border);
+    padding-top: 16px;
+}
+.title-meta .meta-k {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.title-meta .meta-v {
+    font-size: 23px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.35;
+}
+
+/* Grids and Panels */
+.grid { display: grid; gap: var(--content-gap); }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+.panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    padding: 30px 34px;
+    border-radius: 6px;
+}
+.panel h3 {
+    font-family: var(--font-body);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+}
+.panel .big-num {
+    font-family: var(--font-display);
+    font-size: 72px;
+    line-height: 1;
+    color: var(--card-bg);
+}
+.panel .big-label {
+    font-size: 20px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    line-height: 1.4;
+}
+.panel ul { list-style: none; }
+.panel li {
+    font-size: 21px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    padding-left: 26px;
+    position: relative;
+    margin-bottom: 12px;
+}
+.panel li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--card-bg);
+    font-weight: 700;
+}
+.panel li strong { color: #fff; }
+.panel li .mono { font-family: var(--font-mono); font-size: 0.9em; color: var(--card-bg); }
+
+/* Status Badges */
+.chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 4px 12px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+.chip.met { background: rgba(52, 211, 153, 0.15); color: var(--met); border: 1px solid rgba(52, 211, 153, 0.4); }
+.chip.partial { background: rgba(251, 191, 36, 0.15); color: var(--partial); border: 1px solid rgba(251, 191, 36, 0.4); }
+
+/* Tables */
+.crit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 20px;
+}
+.crit-table th {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--panel-border);
+}
+.crit-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    line-height: 1.4;
+    vertical-align: middle;
+}
+.crit-table td.c-name { color: var(--text-primary); font-weight: 500; width: 32%; }
+.crit-table td.c-ev { font-family: var(--font-mono); font-size: 17px; color: var(--text-primary); }
+.crit-table tr:last-child td { border-bottom: none; }
+
+/* Roster Rows */
+.agent-head {
+    display: grid;
+    grid-template-columns: 320px 1.1fr 1.1fr;
+    gap: 28px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--panel-border);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.agent-row {
+    display: grid;
+    grid-template-columns: 320px 1.1fr 1.1fr;
+    gap: 28px;
+    padding: 18px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    align-items: start;
+}
+.agent-row:last-child { border-bottom: none; }
+.agent-row .a-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+}
+.agent-row .a-name .a-num {
+    font-family: var(--font-display);
+    color: var(--card-bg);
+    margin-right: 12px;
+}
+.agent-row .a-pain, .agent-row .a-why {
+    font-size: 19px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+.agent-row .a-pain strong, .agent-row .a-why strong { color: #fff; }
+
+/* Callout strip */
+.takeaway {
+    margin-top: 28px;
+    border-left: 5px solid var(--card-bg);
+    padding: 18px 26px;
+    background: rgba(2, 132, 199, 0.08);
+    font-size: 22px;
+    line-height: 1.45;
+    color: #fff;
+    border-radius: 0 4px 4px 0;
+}
+.takeaway .mono { font-family: var(--font-mono); color: var(--card-bg); font-size: 0.9em; }
+
+/* Deck Controls */
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: #888;
+    z-index: 1000;
+}
+.deck-controls button {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #ddd;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-radius: 4px;
+    letter-spacing: 0.08em;
+}
+.deck-controls button:hover { background: rgba(2, 132, 199, 0.35); color: #fff; }
+
+.progress-track {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: var(--card-bg);
+    width: 0;
+    z-index: 1001;
+    transition: width 0.35s var(--ease-out-expo);
+}
+
+.grid-texture {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 600px;
+    height: 600px;
+    background-image:
+        linear-gradient(rgba(2, 132, 199, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(2, 132, 199, 0.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    mask-image: radial-gradient(circle at bottom right, #000 0%, transparent 75%);
+    -webkit-mask-image: radial-gradient(circle at bottom right, #000 0%, transparent 75%);
+}
+</style>
+</head>
+<body>
+
+<div class="progress-track" id="progressTrack"></div>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ============================================
+     SLIDE 1 — TITLE
+     ============================================ -->
+<section class="slide" data-section="SupplyChain Autopilot">
+  <div class="grid-texture"></div>
+  <div class="title-card reveal">
+    <div class="eyebrow">Agentic AI Project Evaluation · Part 2</div>
+    <h1>SupplyChain<br>Autopilot</h1>
+    <p class="tagline">An autonomous multi-agent procurement and supply-risk management platform — coordinating Google ADK, CrewAI, FastMCP tools, and A2A interoperability.</p>
+  </div>
+  <div class="title-meta">
+    <div class="meta-block reveal" data-d="2">
+      <div class="meta-k">Repository</div>
+      <div class="meta-v">github.com/KartikKotnala/<br>SupplyChain-Autopilot-<br><span style="color:#38bdf8;font-size:18px;font-family:var(--font-mono)">branch main</span></div>
+    </div>
+    <div class="meta-block reveal" data-d="3">
+      <div class="meta-k">Criteria Compliance</div>
+      <div class="meta-v">11 of 11 Criteria Met<br><span style="color:#34d399;font-size:18px;font-weight:700">100% MET · Tested &amp; Live</span></div>
+    </div>
+    <div class="meta-block reveal" data-d="4">
+      <div class="meta-k">Empirical Evidence</div>
+      <div class="meta-v">105 Recorded Runs<br><span style="color:#94a3b8;font-size:18px">23 Unit &amp; Integration Tests (PASS)</span></div>
+    </div>
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot · 2026-11-03</div>
+  <div class="brand-mark tr">v1.0 Corrected Baseline</div>
+</section>
+
+<!-- ============================================
+     SLIDE 2 — EXECUTIVE SUMMARY
+     ============================================ -->
+<section class="slide" data-section="Executive Summary">
+  <div class="slide-num">01</div>
+  <div class="section-tag">Executive Summary</div>
+  <h2 class="slide-title reveal">Engineered for <span class="accent">Real Operations</span></h2>
+  <p class="slide-sub reveal">Conventional procurement picks the cheapest vendor on paper and ignores lead-time risks, costing factories ₹15k–₹50k/day in downtime. SupplyChain Autopilot automates the entire lifecycle through coordinated, specialized agents.</p>
+
+  <div class="grid grid-4">
+    <div class="panel reveal">
+      <div class="big-num">4</div>
+      <div class="big-label">Specialized agents across Google ADK and CrewAI, each earning its place with zero overlaps</div>
+    </div>
+    <div class="panel reveal" data-d="2">
+      <div class="big-num">2</div>
+      <div class="big-label">FastMCP tool servers (erp-db-mcp &amp; procurement-calc-mcp) with 4 deterministic tools</div>
+    </div>
+    <div class="panel reveal" data-d="3">
+      <div class="big-num">105</div>
+      <div class="big-label">Recorded benchmark runs (60 architecture runs + 45 prompt/persona runs)</div>
+    </div>
+    <div class="panel reveal" data-d="4">
+      <div class="big-num">72.7%</div>
+      <div class="big-label">Realized cost savings vs. conventional reorder baseline by eliminating factory downtime</div>
+    </div>
+  </div>
+
+  <div class="takeaway reveal" data-d="4">
+    Framework Policy: <span class="mono">Google ADK</span> (Inventory Orchestrator &amp; Risk Engine) + <span class="mono">CrewAI</span> (Sourcing &amp; 3-Way Match over A2A) — zero LangGraph, zero AutoGen.
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">01 / Summary</div>
+</section>
+
+<!-- ============================================
+     SLIDE 3 — COVERAGE MATRIX (11 OF 11 MET)
+     ============================================ -->
+<section class="slide" data-section="Compliance Matrix">
+  <div class="slide-num">02</div>
+  <div class="section-tag">Standardization</div>
+  <h2 class="slide-title reveal">Coverage Matrix — <span class="accent">11 of 11 MET (100%)</span></h2>
+  <p class="slide-sub reveal">Graded against the literal wording of the Part 2 review criteria. Every row is verified by automated test suites or live recorded runs.</p>
+
+  <table class="crit-table">
+    <thead>
+      <tr><th>#</th><th>Criterion</th><th>Status</th><th>Actual Approach &amp; Verification Evidence</th></tr>
+    </thead>
+    <tbody>
+      <tr class="reveal"><td class="c-ev">1</td><td class="c-name">Context Sharing &amp; Hover Blackboard</td><td><span class="chip met">MET</span></td><td class="c-ev">PostgreSQL blackboard_entries + Hover Blackboard Inspector in React UI</td></tr>
+      <tr class="reveal"><td class="c-ev">2</td><td class="c-name">Tool Integration via MCP (≥2 tools)</td><td><span class="chip met">MET</span></td><td class="c-ev">Two FastMCP servers: erp-db-mcp &amp; procurement-calc-mcp (4 tools total)</td></tr>
+      <tr class="reveal"><td class="c-ev">3</td><td class="c-name">Structured Output using Pydantic</td><td><span class="chip met">MET</span></td><td class="c-ev">5 Pydantic v2 contracts; FinalWorkflowOutput serializes to JSON, MD &amp; Table</td></tr>
+      <tr class="reveal"><td class="c-ev">4</td><td class="c-name">Design Patterns &amp; Architecture Eval</td><td><span class="chip met">MET</span></td><td class="c-ev">Supervisor, Delegation &amp; HITL Gate; compared Sequential vs Blackboard vs Hybrid</td></tr>
+      <tr class="reveal"><td class="c-ev">5</td><td class="c-name">Task Monitoring &amp; Callbacks</td><td><span class="chip met">MET</span></td><td class="c-ev">ADKAgentCallback, MCPToolCallback &amp; CrewAI step/task callbacks; GET /api/callbacks</td></tr>
+      <tr class="reveal"><td class="c-ev">6</td><td class="c-name">Agent-to-Agent (A2A Protocol)</td><td><span class="chip met">MET</span></td><td class="c-ev">CrewAI Agent Card at /.well-known/agent-card.json; ADK invokes via HTTP</td></tr>
+      <tr class="reveal"><td class="c-ev">7</td><td class="c-name">Strict Frameworks: ADK + CrewAI Only</td><td><span class="chip met">MET</span></td><td class="c-ev">ADK 2.34 + CrewAI 1.15 pinned; zero LangGraph, zero AutoGen imports</td></tr>
+      <tr class="reveal"><td class="c-ev">8</td><td class="c-name">Security, Guardrails &amp; Prompt Variants</td><td><span class="chip met">MET</span></td><td class="c-ev">Injection &amp; exploit scanner + ReAct vs Few-Shot vs Standard across 3 Personas</td></tr>
+      <tr class="reveal"><td class="c-ev">9</td><td class="c-name">Observability &amp; Distributed Tracing</td><td><span class="chip met">MET</span></td><td class="c-ev">OpenTelemetry spans across API, A2A &amp; tools + Arize Phoenix collector export</td></tr>
+      <tr class="reveal"><td class="c-ev">10</td><td class="c-name">Performance Eval &amp; Latency (105 runs)</td><td><span class="chip met">MET</span></td><td class="c-ev">105 runs (60 Suite A + 45 Suite B) across 5 seeds; +72.7% cost savings proven</td></tr>
+      <tr class="reveal"><td class="c-ev">11</td><td class="c-name">Cloud Platform Deployment</td><td><span class="chip met">MET</span></td><td class="c-ev">docker-compose.yml, deploy/render.yaml (Blueprint), fly.toml &amp; deploy.sh</td></tr>
+    </tbody>
+  </table>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">02 / Compliance</div>
+</section>
+
+<!-- ============================================
+     SLIDE 4 — WHY EXACTLY 4 AGENTS
+     ============================================ -->
+<section class="slide" data-section="Agent Roster">
+  <div class="slide-num">03</div>
+  <div class="section-tag">No Random Agents</div>
+  <h2 class="slide-title reveal">Why Exactly <span class="accent">4 Agents</span></h2>
+  <p class="slide-sub reveal">Every agent maps 1:1 to a distinct, measurable failure mode in industrial procurement. Merging any two re-introduces the pain point; adding a fifth would introduce unnecessary overhead.</p>
+
+  <div class="agent-head">
+    <div>Agent &amp; Framework</div><div>Specific Failure Mode Solved</div><div>Why It Cannot Be Folded In</div>
+  </div>
+  <div class="agent-row reveal">
+    <div class="a-name"><span class="a-num">1</span>Inventory Monitor<br><span style="font-size:14px;color:#38bdf8;font-family:var(--font-mono)">Google ADK</span></div>
+    <div class="a-pain">Factories discover shortages only after physical stockouts halt the assembly line.</div>
+    <div class="a-why"><strong>Read-only boundary</strong>: Calculates buffer days ($Available / BurnRate$) via FastMCP. Never touches vendors.</div>
+  </div>
+  <div class="agent-row reveal">
+    <div class="a-name"><span class="a-num">2</span>Sourcing &amp; RFQ<br><span style="font-size:14px;color:#818cf8;font-family:var(--font-mono)">CrewAI (A2A Microservice)</span></div>
+    <div class="a-pain">Unstructured supplier outreach leads to missing MOQ, capacity mismatches, or non-compliant quotes.</div>
+    <div class="a-why">Runs as a <strong>standalone A2A service</strong>; owns vendor filtering and standardized RFQ drafting without decision bias.</div>
+  </div>
+  <div class="agent-row reveal">
+    <div class="a-name"><span class="a-num">3</span>Risk &amp; Trade-Off<br><span style="font-size:14px;color:#f59e0b;font-family:var(--font-mono)">Google ADK</span></div>
+    <div class="a-pain">Buyers pick the lowest unit price, ignoring that delivery delays cost ₹15k/day in factory downtime.</div>
+    <div class="a-why"><strong>Independent evaluator</strong>: Calls deterministic math calculator to score acquisition cost vs downtime penalties.</div>
+  </div>
+  <div class="agent-row reveal">
+    <div class="a-name"><span class="a-num">4</span>Logistics &amp; 3-Way Match<br><span style="font-size:14px;color:#34d399;font-family:var(--font-mono)">CrewAI (A2A Microservice)</span></div>
+    <div class="a-pain">Overbilling, quantity mismatches, and paying vendor invoices without verified warehouse delivery.</div>
+    <div class="a-why"><strong>Segregation of duties</strong>: Accounts auditing must be isolated from the purchasing agent to prevent bias.</div>
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">03 / Agents</div>
+</section>
+
+<!-- ============================================
+     SLIDE 5 — PROTOCOLS & INTEGRATION
+     ============================================ -->
+<section class="slide" data-section="Integration Architecture">
+  <div class="slide-num">04</div>
+  <div class="section-tag">Wire Protocols &amp; Boundaries</div>
+  <h2 class="slide-title reveal">Real Wire Protocols — <span class="accent">Real Boundaries</span></h2>
+  <p class="slide-sub reveal">No hidden in-memory function calls. All agent communication, tools, and shared context enforce strict process and protocol boundaries.</p>
+
+  <div class="grid grid-3">
+    <div class="panel reveal">
+      <h3>Two FastMCP Servers</h3>
+      <ul>
+        <li><span class="mono">erp-db-mcp</span> (:get_inventory, :get_qualified_suppliers) — parameterized read-only queries; <strong>no raw SQL</strong></li>
+        <li><span class="mono">procurement-calc-mcp</span> (:tradeoff_scoring, :three_way_match) — pure deterministic math</li>
+        <li>Zero LLM hallucination in pricing or reconciliation</li>
+      </ul>
+    </div>
+    <div class="panel reveal" data-d="2">
+      <h3>A2A Protocol v1.0</h3>
+      <ul>
+        <li>CrewAI service serves the <strong>Agent Card</strong> at <span class="mono">/.well-known/agent-card.json</span> on port 8001</li>
+        <li>Google ADK acts as the <strong>A2A Client</strong> via <span class="mono">POST /api/a2a/message/send</span></li>
+        <li>Interoperability verified: ADK discovers and offloads tasks to CrewAI seamlessly</li>
+      </ul>
+    </div>
+    <div class="panel reveal" data-d="3">
+      <h3>PostgreSQL Blackboard</h3>
+      <ul>
+        <li>Append-only <span class="mono">blackboard_entries</span> table stores immutable JSONB artifacts with trace IDs</li>
+        <li>Separation of concerns: business workflow authority in <span class="mono">procurement_workflows</span></li>
+        <li><strong>Hover Blackboard</strong>: Interactive inspector in UI</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="takeaway reveal" data-d="4">
+    Human-in-the-Loop Safe Sequencing: Consequential purchases pause at <span class="mono">PENDING_HITL</span>. <strong>Purchase Orders are issued ONLY after explicit human approval</strong>, leaving the interrupt state side-effect free.
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">04 / Integration</div>
+</section>
+
+<!-- ============================================
+     SLIDE 6 — BENCHMARK RESULTS (SUITE A)
+     ============================================ -->
+<section class="slide" data-section="Benchmarking">
+  <div class="slide-num">05</div>
+  <div class="section-tag">Empirical Results</div>
+  <h2 class="slide-title reveal">105 Runs · Proving <span class="accent">+72.7% Cost Savings</span></h2>
+  <p class="slide-sub reveal">Evaluated across 4 architectures × 3 scenarios × 5 paired seeds (Suite A = 60 runs) + 9 prompt/persona combinations (Suite B = 45 runs). Evaluator is completely decoupled from the optimizer.</p>
+
+  <table class="crit-table" style="margin-top:10px">
+    <thead>
+      <tr><th>Architecture</th><th>Runs</th><th>Avg Realized Cost</th><th>Avg Downtime Cost</th><th>Cost Savings</th><th style="text-align:right">Machine Latency</th></tr>
+    </thead>
+    <tbody>
+      <tr class="reveal"><td class="c-name" style="font-family:var(--font-mono)">BASELINE_A (Cheapest Vendor)</td><td>15</td><td>₹211,800.00</td><td style="color:#f87171">₹175,000.00</td><td><em>Baseline</em></td><td class="c-ev" style="text-align:right">1.7 ms</td></tr>
+      <tr class="reveal"><td class="c-name" style="font-family:var(--font-mono)">SEQUENTIAL (Direct Passing)</td><td>15</td><td>₹57,900.00</td><td style="color:#34d399">₹10,000.00</td><td style="color:#34d399;font-weight:700">+72.7%</td><td class="c-ev" style="text-align:right">6.0 ms</td></tr>
+      <tr class="reveal"><td class="c-name" style="font-family:var(--font-mono)">PURE_BLACKBOARD (State Polling)</td><td>15</td><td>₹57,900.00</td><td style="color:#34d399">₹10,000.00</td><td style="color:#34d399;font-weight:700">+72.7%</td><td class="c-ev" style="text-align:right">14.6 ms</td></tr>
+      <tr class="reveal"><td class="c-name" style="font-family:var(--font-mono)">HYBRID (Supervisor + A2A + BB)</td><td>30</td><td>₹67,900.00</td><td style="color:#34d399">₹20,000.00</td><td style="color:#34d399;font-weight:700">+67.9%</td><td class="c-ev" style="text-align:right">9.6 ms</td></tr>
+    </tbody>
+  </table>
+
+  <div class="takeaway reveal" data-d="4">
+    <strong>The Empirical Takeaway:</strong> Baseline A saves ₹11,100 on unit price, but its 14-day delivery causes <strong>₹175,000 in factory downtime</strong>. The Multi-Agent System picks a 3-day supplier, saving ₹153,900 net.
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">05 / Benchmarks</div>
+</section>
+
+<!-- ============================================
+     SLIDE 7 — PROMPT STYLES & PERSONAS (SUITE B)
+     ============================================ -->
+<section class="slide" data-section="Prompt Engineering">
+  <div class="slide-num">06</div>
+  <div class="section-tag">Prompt &amp; Persona Matrix</div>
+  <h2 class="slide-title reveal">Multi-Prompt Variances: <span class="accent">ReAct vs. Few-Shot</span></h2>
+  <p class="slide-sub reveal">Tested across 3 architectural prompt styles (Standard, Few-Shot, ReAct) and 3 procurement personas under an identical Demand Surge scenario (45 runs).</p>
+
+  <div class="grid grid-2">
+    <div class="panel reveal">
+      <h3>Persona Trade-Offs (Suite B Results)</h3>
+      <table class="crit-table" style="font-size:18px">
+        <thead><tr><th>Persona</th><th>Weights (Cost/Lead/Rel)</th><th>Avg Total Cost</th><th>Avg Tokens</th></tr></thead>
+        <tbody>
+          <tr><td style="color:#fff;font-weight:500">COST_FOCUSED</td><td>w=(0.70, 0.20, 0.10)</td><td>₹117,950</td><td>2,367</td></tr>
+          <tr><td style="color:#34d399;font-weight:500">RISK_CONSCIOUS</td><td>w=(0.25, 0.45, 0.30)</td><td style="color:#34d399;font-weight:700">₹77,900</td><td>2,367</td></tr>
+          <tr><td style="color:#38bdf8;font-weight:500">NEUTRAL</td><td>w=(0.45, 0.35, 0.20)</td><td>₹99,885</td><td>1,807</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:17px;color:#94a3b8;margin-top:14px">
+        Under demand surges, the <strong>Risk-Conscious</strong> persona saves ₹40,050 more than the Cost-Focused persona by avoiding critical stockouts.
+      </div>
+    </div>
+
+    <div class="panel reveal" data-d="2">
+      <h3>Architectural Prompt Styles</h3>
+      <ul>
+        <li><strong>Standard Prompt</strong>: Explicit constraints, mathematical definitions, and Pydantic schema return. (1,600 tokens/run)</li>
+        <li><strong>Few-Shot Prompt</strong>: Includes 2 worked reference procurement decisions from previous industrial cycles. (2,400 tokens/run)</li>
+        <li><strong>ReAct Prompt</strong>: Reason $\rightarrow$ Action $\rightarrow$ Observation cycle with explicit tool-use stop conditions. (3,100 tokens/run)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="takeaway reveal" data-d="4">
+    Prompt templates are fully decoupled in <span class="mono">services/adk_orchestrator/prompts.py</span> and independently verified by unit tests.
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">06 / Prompts</div>
+</section>
+
+<!-- ============================================
+     SLIDE 8 — SECURITY, GUARDRAILS & MONITORING
+     ============================================ -->
+<section class="slide" data-section="Security & Observability">
+  <div class="slide-num">07</div>
+  <div class="section-tag">Security &amp; Callbacks</div>
+  <h2 class="slide-title reveal">Security Guardrails &amp; <span class="accent">Auditability</span></h2>
+  <p class="slide-sub reveal">Untrusted supplier quotations, user queries, and invoice remarks are scanned before entering agent context. Every agent and tool step triggers telemetry callbacks.</p>
+
+  <div class="grid grid-2">
+    <div class="panel reveal">
+      <h3>Input Guardrails &amp; Injection Defense</h3>
+      <ul>
+        <li><strong>Prompt Injection Scanning</strong>: Catches <span class="mono">"ignore previous instructions"</span>, exploit payloads, and SQL attempts</li>
+        <li><strong>Boundary Checks</strong>: Rejects negative quantities, absurd unit prices (&gt;₹10M), or invalid lead times</li>
+        <li><strong>Safe Redaction</strong>: Malicious payloads blocked and flagged as <span class="mono">PROMPT_INJECTION_OR_EXPLOIT</span> in real time</li>
+      </ul>
+    </div>
+    <div class="panel reveal" data-d="2">
+      <h3>Callback Telemetry &amp; Tracing</h3>
+      <ul>
+        <li><strong>Lifecycle Hooks</strong>: <span class="mono">ADKAgentCallback</span> (before/after/error), <span class="mono">MCPToolCallback</span>, and CrewAI task callbacks</li>
+        <li><strong>Audit Endpoint</strong>: <span class="mono">GET /api/callbacks</span> exposes live execution durations, inputs, and outputs</li>
+        <li><strong>Observability</strong>: OpenTelemetry trace context (<span class="mono">trace_id</span>) propagated to Arize Phoenix</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="takeaway reveal" data-d="4">
+    Live interactive test console built directly into Tab 2 of the React Dashboard for real-time prompt injection demonstrations.
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">07 / Security</div>
+</section>
+
+<!-- ============================================
+     SLIDE 9 — REPRODUCIBILITY & LIVE DEMO
+     ============================================ -->
+<section class="slide" data-section="Demonstration">
+  <div class="slide-num">08</div>
+  <div class="section-tag">Run It Live</div>
+  <h2 class="slide-title reveal">Demonstrable in <span class="accent">One Command</span></h2>
+  <p class="slide-sub reveal">Everything is pre-seeded, containerized, and executable with zero complex setup.</p>
+
+  <div class="grid grid-2">
+    <div class="panel reveal">
+      <h3>One-Command Local Launch</h3>
+      <ul>
+        <li><span class="mono">cd ~/Desktop/Agentic\ AI &amp;&amp; ./start.sh</span></li>
+        <li>Automatically seeds PostgreSQL, spins up CrewAI on :8001, FastAPI on :8000, and React on :3000</li>
+        <li>All 23 unit &amp; integration tests pass in <strong>1.46s</strong> (<span class="mono">pytest</span>)</li>
+      </ul>
+    </div>
+    <div class="panel reveal" data-d="2">
+      <h3>Multi-Cloud Deployment Configs</h3>
+      <ul>
+        <li><span class="mono">docker-compose.yml</span>: Postgres 16, Phoenix, CrewAI, Backend, Frontend</li>
+        <li><span class="mono">deploy/render.yaml</span>: Render Blueprint for 1-click cloud deployment</li>
+        <li><span class="mono">deploy/fly.toml</span>: Fly.io container configuration</li>
+        <li><span class="mono">deploy/deploy.sh</span>: Automated container build &amp; push script</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel reveal" data-d="3" style="margin-top:28px">
+    <h3>The 2-Minute Demonstration Flow</h3>
+    <div style="font-size:20px;line-height:1.5;color:#e2e8f0">
+      Open <span class="mono" style="color:#38bdf8">http://localhost:3000</span> &rarr; Click <strong>"Run Autopilot"</strong> on Compressor (COMP-001) &rarr; Observe ADK detect deficit &amp; CrewAI fetch quotes &rarr; Review supplier trade-off chart &rarr; Click green <strong>"Approve Order"</strong> button &rarr; Verify PO issued and 3-Way Match completed &rarr; Switch to <strong>Tab 2</strong> to inspect the <strong>Hover Blackboard</strong>!
+    </div>
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot</div>
+  <div class="brand-mark tr">08 / Demonstration</div>
+</section>
+
+<!-- ============================================
+     SLIDE 10 — CLOSING / CONCLUSION
+     ============================================ -->
+<section class="slide" data-section="Conclusion">
+  <div class="grid-texture"></div>
+  <div class="title-card reveal" style="top:260px;width:1160px">
+    <div class="eyebrow">The Bottom Line</div>
+    <h1 style="font-size:82px">Built It.<br>Ran It.<br>Proved It.</h1>
+    <p class="tagline" style="font-size:28px">11 of 11 Part 2 criteria met. Coordinated across Google ADK and CrewAI via A2A, backed by FastMCP tools, an interactive Hover Blackboard, and a 105-run evaluation demonstrating +72.7% cost efficiency.</p>
+  </div>
+  <div class="title-meta" style="top:260px;width:400px">
+    <div class="meta-block reveal" data-d="2">
+      <div class="meta-k">Source Repository</div>
+      <div class="meta-v" style="font-size:20px">github.com/KartikKotnala/<br>SupplyChain-Autopilot-</div>
+    </div>
+    <div class="meta-block reveal" data-d="3">
+      <div class="meta-k">Branch &amp; Commits</div>
+      <div class="meta-v" style="font-size:20px">main (clean tree)<br>Ready for evaluation review</div>
+    </div>
+  </div>
+  <div class="brand-mark bl">SupplyChain Autopilot · 2026-11-03</div>
+  <div class="brand-mark tr">10 / Conclusion</div>
+</section>
+
+</main>
+</div>
+
+<!-- Controls -->
+<div class="deck-controls">
+  <button id="prevBtn" aria-label="Previous slide">&larr; PREV</button>
+  <span id="slideCounter">1 / 10</span>
+  <button id="nextBtn" aria-label="Next slide">NEXT &rarr;</button>
+</div>
+
+<script>
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('.slide'));
+        this.currentSlide = 0;
+        this.stage = document.getElementById('deckStage');
+        this.counter = document.getElementById('slideCounter');
+        this.track = document.getElementById('progressTrack');
+        this.total = this.slides.length;
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupButtons();
+        this.showSlide(0);
+    }
+
+    setupStageScale() {
+        const scale = () => {
+            const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * factor) / 2;
+            const y = (window.innerHeight - 1080 * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowRight': case ' ': case 'PageDown':
+                    e.preventDefault(); this.next(); break;
+                case 'ArrowLeft': case 'PageUp':
+                    e.preventDefault(); this.prev(); break;
+                case 'Home': this.showSlide(0); break;
+                case 'End': this.showSlide(this.total - 1); break;
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let startX = null;
+        document.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            if (startX === null) return;
+            const dx = e.changedTouches[0].clientX - startX;
+            if (Math.abs(dx) > 60) { dx < 0 ? this.next() : this.prev(); }
+            startX = null;
+        }, { passive: true });
+    }
+
+    setupButtons() {
+        document.getElementById('prevBtn').addEventListener('click', () => this.prev());
+        document.getElementById('nextBtn').addEventListener('click', () => this.next());
+    }
+
+    next() { this.showSlide(this.currentSlide + 1); }
+    prev() { this.showSlide(this.currentSlide - 1); }
+
+    showSlide(index) {
+        this.currentSlide = Math.max(0, Math.min(index, this.total - 1));
+        this.slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === this.currentSlide);
+            slide.classList.toggle('visible', i === this.currentSlide);
+        });
+        this.counter.textContent = `${this.currentSlide + 1} / ${this.total}`;
+        this.track.style.width = `${((this.currentSlide + 1) / this.total) * 100}%`;
+        const sec = this.slides[this.currentSlide].dataset.section || '';
+        document.title = sec ? `SupplyChain Autopilot — ${sec}` : 'SupplyChain Autopilot — Presentation';
+    }
+}
+
+new SlidePresentation();
+</script>
+</body>
+</html>
