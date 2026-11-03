@@ -136,10 +136,18 @@ export const ExperimentsTab: React.FC<Props> = ({ benchmarkData, onRefresh }) =>
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={(v) => `₹${v / 1000}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderColor: '#38bdf8',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                    padding: '10px 14px',
+                  }}
+                  labelStyle={{ color: '#38bdf8', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}
+                  itemStyle={{ color: '#f8fafc', fontSize: '12px' }}
                   formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, '']}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ color: '#cbd5e1', fontSize: '11px', paddingTop: '8px' }} />
                 <Bar dataKey="Realized Cost" fill="#38bdf8" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Downtime Cost" fill="#f87171" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -163,10 +171,18 @@ export const ExperimentsTab: React.FC<Props> = ({ benchmarkData, onRefresh }) =>
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={(v) => `₹${v / 1000}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderColor: '#a855f7',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                    padding: '10px 14px',
+                  }}
+                  labelStyle={{ color: '#c084fc', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}
+                  itemStyle={{ color: '#f8fafc', fontSize: '12px' }}
                   formatter={(val: any) => [`₹${Number(val).toLocaleString()}`, '']}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ color: '#cbd5e1', fontSize: '11px', paddingTop: '8px' }} />
                 <Bar dataKey="Realized Cost" fill="#a855f7" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Downtime Cost" fill="#f43f5e" radius={[4, 4, 0, 0]} />
               </BarChart>
